@@ -169,6 +169,7 @@ def fzf(
             stdout=subprocess.PIPE,
             stderr=None,  # Let fzf render its UI to the terminal
             text=True,
+            encoding="utf-8",
         )
         if result.returncode != 0:
             return []  # User cancelled
