@@ -104,8 +104,8 @@ uv run manage-artifacts.py --dry-run
 ### ディレクトリ構造
 
 ```
-~/Documents/NotebookArtifacts/    ← ARTIFACT_BACKUP_DIR (Windows)
-~/NotebookArtifacts/              ← ARTIFACT_BACKUP_DIR (Unix)
+~/Documents/NotebookArtifacts/    ← ARTIFACT_BACKUP_DIR (Windows デフォルト)
+~/NotebookArtifacts/              ← ARTIFACT_BACKUP_DIR (Unix デフォルト)
   └── My_Notebook/                ← ノートブックタイトル（サニタイズ済み）
       ├── 20260101_audio_Deep_Dive.mp4
       ├── 20260101_infographic_Summary.png
@@ -147,12 +147,25 @@ uv run manage-artifacts.py --dry-run
 | `NOTEBOOKLM_TIMEOUT` | `90` | NotebookLM API HTTP タイムアウト (秒) |
 | `NO_EMOJI` | - | `1` に設定すると絵文字なし（ASCII のみ） |
 
+環境変数の永続設定:
+
+```powershell
+# Windows (PowerShell)
+[Environment]::SetEnvironmentVariable("ARTIFACT_BACKUP_DIR", "D:\NotebookArtifacts", "User")
+```
+
+```bash
+# Linux / macOS
+echo 'export ARTIFACT_BACKUP_DIR=~/NotebookArtifacts' >> ~/.bashrc
+```
+
 ## クロスプラットフォーム対応
 
 | 項目 | Windows | macOS / Linux |
 |------|---------|---------------|
 | asyncio | `WindowsSelectorEventLoopPolicy` | デフォルト |
 | エンコーディング | `PYTHONUTF8=1` 自動設定 | デフォルト UTF-8 |
+| subprocess | `encoding="utf-8"` 明示（cp932 回避） | デフォルト UTF-8 |
 | ghostscript | `gswin64c` / `gswin32c` 自動検出 | `gs` |
 | 絵文字 | Windows Terminal: OK / レガシーcmd: ASCII | OK |
 | パス | `pathlib.Path`（バックスラッシュ自動） | `pathlib.Path` |
@@ -165,9 +178,64 @@ uv run manage-artifacts.py --dry-run
 - `notebooklm-py` >= 0.3.4 (PEP 723 で自動インストール)
 - `fzf` (CLI ツール)
 
-### オプション（後処理用）
+### 推奨（後処理用）
+
+- `ghostscript` — slides (PDF) 圧縮。未インストール時は圧縮スキップ（10-20MB → 5-10MB の削減効果あり）
+- `pdftoppm` (poppler) — slides ウォーターマーク除去（PDF→画像変換）
+
+### オプション
 
 - `ffmpeg` — audio 圧縮
-- `ghostscript` — slides (PDF) 圧縮
-- `Pillow` — infographic/slides ウォーターマーク除去 + infographic リサイズ（notebooklm-py 同梱）
-- `pdftoppm` (poppler-utils) — slides ウォーターマーク除去（PDF→画像変換）
+- `Pillow` — infographic/slides ウォーターマーク除去 + infographic リサイズ（notebooklm-py に同梱）
+
+## Windows セットアップ手順
+
+検証済み手順（Windows 11 + PowerShell + Windows Terminal）:
+
+```powershell
+# 1. uv インストール
+powershell -c "irm https://astral.sh/uv/install.ps1 | iex"
+
+# 2. fzf インストール（必須）
+winget install fzf
+
+# 3. Playwright ブラウザインストール（認証用）
+uvx --from notebooklm-py --with playwright playwright install chromium
+
+# 4. 認証（ブラウザが開く → Google ログイン → Enter）
+uvx --from notebooklm-py --with playwright notebooklm login
+# ※ リダイレクトエラーが発生する場合は WSL で認証してファイルをコピー:
+#    cp ~/.notebooklm/storage_state.json /mnt/c/Users/<username>/.notebooklm/
+
+# 5. ghostscript インストール（推奨 — PDF 圧縮）
+# https://ghostscript.com/releases/gsdnld.html からインストーラーをダウンロード
+# インストール後: gswin64c --version で確認
+
+# 6. poppler インストール（推奨 — スライド WM 除去）
+irm get.scoop.sh | iex
+scoop install poppler
+# pdftoppm -v で確認
+
+# 7. 出力先ディレクトリを設定（任意）
+[Environment]::SetEnvironmentVariable("ARTIFACT_BACKUP_DIR", "D:\NotebookArtifacts", "User")
+
+# ※ PowerShell を再起動して PATH を反映
+
+# 8. 実行
+git clone https://github.com/YutakaKawauchi/notebooklm-manage.git
+cd notebooklm-manage
+uv run manage-artifacts.py
+```
+
+## 既知の問題
+
+### Windows: `notebooklm login` のリダイレクトエラー
+
+Google アカウントに既存セッションがある場合、Playwright のナビゲーションが Google のリダイレクトと競合してエラーになることがある。
+
+**回避策**: WSL/Linux 側で `notebooklm login` を実行し、`~/.notebooklm/storage_state.json` を Windows 側にコピーする。
+
+### Windows: fzf の cp932 エンコーディング
+
+日本語 Windows では `subprocess.run(text=True)` がデフォルトで cp932 を使用する。
+絵文字や一部の Unicode 文字が `UnicodeEncodeError` になるため、`encoding="utf-8"` を明示的に指定して解決。
