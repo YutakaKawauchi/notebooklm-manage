@@ -14,10 +14,10 @@ before external tools (ghostscript, pdftoppm) were installed.
 - Infographics (PNG): watermark auto-detection + 1/2 resize
 
 Usage:
-    uv run patch-postprocess.py D:\NotebookArtifacts\Business_雑多
-    uv run patch-postprocess.py D:\NotebookArtifacts\Business_雑多 --dry-run
-    uv run patch-postprocess.py D:\NotebookArtifacts\Business_雑多 --slides-only
-    uv run patch-postprocess.py D:\NotebookArtifacts\Business_雑多 --infographics-only
+    uv run patch-postprocess.py /path/to/artifacts
+    uv run patch-postprocess.py /path/to/artifacts --dry-run
+    uv run patch-postprocess.py /path/to/artifacts --slides-only
+    uv run patch-postprocess.py /path/to/artifacts --infographics-only
 """
 
 import argparse
